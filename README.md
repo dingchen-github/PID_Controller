@@ -1,98 +1,119 @@
 # CarND-Controls-PID
-Self-Driving Car Engineer Nanodegree Program
+A project in the Self-Driving Car Engineer Nanodegree Program
 
 ---
 
-## Dependencies
+## Project Goal
 
-* cmake >= 3.5
- * All OSes: [click here for installation instructions](https://cmake.org/install/)
-* make >= 4.1(mac, linux), 3.81(Windows)
-  * Linux: make is installed by default on most Linux distros
-  * Mac: [install Xcode command line tools to get make](https://developer.apple.com/xcode/features/)
-  * Windows: [Click here for installation instructions](http://gnuwin32.sourceforge.net/packages/make.htm)
-* gcc/g++ >= 5.4
-  * Linux: gcc / g++ is installed by default on most Linux distros
-  * Mac: same deal as make - [install Xcode command line tools]((https://developer.apple.com/xcode/features/)
-  * Windows: recommend using [MinGW](http://www.mingw.org/)
-* [uWebSockets](https://github.com/uWebSockets/uWebSockets)
-  * Run either `./install-mac.sh` or `./install-ubuntu.sh`.
-  * If you install from source, checkout to commit `e94b6e1`, i.e.
-    ```
-    git clone https://github.com/uWebSockets/uWebSockets 
-    cd uWebSockets
-    git checkout e94b6e1
-    ```
-    Some function signatures have changed in v0.14.x. See [this PR](https://github.com/udacity/CarND-MPC-Project/pull/3) for more details.
-* Simulator. You can download these from the [project intro page](https://github.com/udacity/self-driving-car-sim/releases) in the classroom.
+The goal of this project is to implement a PID controller for the steering angle to drive the car around a track autonomously. The PID parameters can be tuned manually or automatically, e.g. with twiddle.
 
-Fellow students have put together a guide to Windows set-up for the project [here](https://s3-us-west-1.amazonaws.com/udacity-selfdrivingcar/files/Kidnapped_Vehicle_Windows_Setup.pdf) if the environment you have set up for the Sensor Fusion projects does not work for this project. There's also an experimental patch for windows in this [PR](https://github.com/udacity/CarND-PID-Control-Project/pull/3).
+The twiddle algorithm was taught in the lecture. My code implements it.
 
-## Basic Build Instructions
+```
+def twiddle(tol=0.2):
+    # Don't forget to call `make_robot` before every call of `run`!
+    p = [0, 0, 0]
+    dp = [1, 1, 1]
+    robot = make_robot()
+    x_trajectory, y_trajectory, best_err = run(robot, p)
+    while sum(dp) > tol:
+        for i in range(len(p)):
+            p[i] += dp[i]
+            robot = make_robot()
+            x_trajectory, y_trajectory, err = run(robot, p)
+            if err < best_err:
+                best_err = err
+                dp[i] *= 1.1
+            else:
+                p[i] -= 2*dp[i]
+                robot = make_robot()
+                x_trajectory, y_trajectory, err = run(robot, p)
+                if err < best_err:
+                    best_err = err
+                    dp[i] *= 1.1
+                else:
+                    p[i] += dp[i]
+                    dp[i] *= 0.9
+    return p, best_err
+```
 
-1. Clone this repo.
-2. Make a build directory: `mkdir build && cd build`
-3. Compile: `cmake .. && make`
-4. Run it: `./pid`. 
+---
 
-Tips for setting up your environment can be found [here](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/0949fca6-b379-42af-a919-ee50aa304e6a/lessons/f758c44c-5e40-4e01-93b5-1a82aa4e044f/concepts/23d376c7-0195-4276-bdf0-e02f1f3c665d)
+## Code Implementation
 
-## Editor Settings
+### PID.cpp
 
-We've purposefully kept editor configuration files out of this repo in order to
-keep it as simple and environment agnostic as possible. However, we recommend
-using the following settings:
+A class called PID is already provided, but not fully defined. I need to define the functions.
 
-* indent using spaces
-* set tab width to 2 spaces (keeps the matrices in source code aligned)
+1. Init: Pass the variables to the Kp, Ki and Kd, and initialise the PID errors to be 0.
+2. UpdateError: First calculate the d error, which is the difference between the current cte and the last one. Then pass the current cte to the p error. At last update the i error.
+3. TotalError: Calculate the total error using p, i and d errors. This total error is the output for the variable to be controlled, in this project the steering angle.
+4. PrintParam: Print Kp, Ki and Kd after finishing twiddle.
 
-## Code Style
+### main.cpp
 
-Please (do your best to) stick to [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html).
+#### Variable Definition (line 40-51)
 
-## Project Instructions and Rubric
+Define the variables to be passed to h.onMessage.
 
-Note: regardless of the changes you make, your project must be buildable using
-cmake and make!
+|Variable|Meaning|
+|:-------------:|:-------------:|
+|p[3]|A list of Kp, Ki and Kd. If we want to use twiddle, initialise all three values to be zero. Otherwise define p with optimised parameters.|
+|dp[3]|A list of twiddle parameters.|
+|n|Number of simulation cycles in twiddle.|
+|twiddle|A bool variable as a flag indicating using twiddle mode or not.|
+|tol|Twiddle tolerance. The sum of dp's three values. If this tolerance is reached, then twiddle is completed.|
+|err|Twiddle error. Sum of squares of cte (to be divided by n).|
+|best_err|Best twiddle error.|
+|it|Iterator for p and dp index.|
+|new_run|Flag indicating whether we will begin a new simulation cycle for the next p and dp index.|
+|minus|Flag indicating whether we need to subtract dp from p.|
 
-More information is only accessible by people who are already enrolled in Term 2
-of CarND. If you are enrolled, see [the project page](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/f1820894-8322-4bb3-81aa-b26b3c6dcbaf/lessons/e8235395-22dd-4b87-88e0-d108c5e5bbf4/concepts/6a4d8d42-6a04-4aa6-b284-1697c0fd6562)
-for instructions and the project rubric.
+#### Twiddle (line 76-150)
 
-## Hints!
+* If n is 0, initialise pid parameters to the new p values and pid errors to be zero. This is similar to the "call `make_robot` before every call of `run`" part in the twiddle algorithm.
 
-* You don't have to follow this directory structure, but if you do, your work
-  will span all of the .cpp files here. Keep an eye out for TODOs.
+* Use pid functions to update the errors and calculate the total error as the steering angle.
 
-## Call for IDE Profiles Pull Requests
+* Adjust throttle based on the speed and steering angle. When both speed and steering angle are big, brake the car. The steering angle is between -1 and 1, and I have observed that in most of the times, the car only need a steering value between -0.1 and 0.1, so we can consider an absolute angle bigger than 0.1 represents a sharp turn. For the speed part, we can adjust the threshold. When the PID parameters are not optimised, a threshld of 20 or even 15 can help keep the car on the track. After we have got the optimised parameters, the speed part doesn't matter any more, the car stays on the track driving between 32-35 MPH.
 
-Help your fellow students!
+* If the car goes off track, reset the simulator. Through trial and error I found out the cte threshold of 4 to be good.
 
-We decided to create Makefiles with cmake to keep this project as platform
-agnostic as possible. Similarly, we omitted IDE profiles in order to we ensure
-that students don't feel pressured to use one IDE or another.
+* Accumulate the twiddle error and the cycle number.
 
-However! I'd love to help people get up and running with their IDEs of choice.
-If you've created a profile for an IDE that you think other students would
-appreciate, we'd love to have you add the requisite profile files and
-instructions to ide_profiles/. For example if you wanted to add a VS Code
-profile, you'd add:
+* When a certain cycle number is reached, we begin the twiddle part (line 96-137). Otherwise, just pass the steering value and speed to the simulator (line 138-143).
 
-* /ide_profiles/vscode/.vscode
-* /ide_profiles/vscode/README.md
+* Twiddle part:
+  * Calculate the average error.
+  * If this is a new simulation cycle, as flagged by new_run, we add dp[it] to p[it], and set new_run to false. The cout part helps us track p during the simulation.
+  * If this is not a new simulation cycle, we compare the current twiddle error to the best error.
+  * If we find a new best error, we update the best error, incease dp[it] by 10%, move on the next index, set new_run to true and set the minus flag to true.
+  * If we didn't find a new best error, we need to check whether we need to subtract dp from p, with the help of the minus flag. If minus is false, we bring p[it] to the original value, reduce dp[it] by 10% and go on to the next cycle.
+  * Last but not the lease, reset the twiddle error and cycle number. If the car stays on the track, then we don't need to reset the simulator, just let the car run further.
 
-The README should explain what the profile does, how to take advantage of it,
-and how to install it.
 
-Frankly, I've never been involved in a project with multiple IDE profiles
-before. I believe the best way to handle this would be to keep them out of the
-repo root to avoid clutter. My expectation is that most profiles will include
-instructions to copy files to a new location to get picked up by the IDE, but
-that's just a guess.
+* Check whether we have reached the twiddle tolerance. If yes, set twiddle flag to be false, print the PID parameters and close the simulation session.
 
-One last note here: regardless of the IDE used, every submitted project must
-still be compilable with cmake and make./
+#### No Twiddle (line 151-164)
 
-## How to write a README
-A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
+If twiddle flag is false, we enter the normal driving mode, with the PID parameters initialised before h.onMesage or after twiddle.
 
+---
+
+## Parameter Tuning
+
+In the twiddle mode, I initialise p to be zero. But I don't need to set dp all to 1, because after "driving" on the track, I found out that:
+
+* Kp is proportional to cte. If Kp is too big, the car drives from left to right to left with big oscillations.
+* Kd is related to cte differences. It helps to reduce the oscillations.
+* Ki is related to the accumlated errors. Ki needs to be much smaller than Kp and Kd, because accumlated errors would be bigger and bigger as the car drives along.
+
+So I found the the most efficient way being to tune Kp in 0.1 step, Ki in 0.001 and Kd in 1. These are my initial values of dp.
+
+Then I run the twiddle mode. With different speed limitations (see "Adjust throttle" part), I got the following results:
+
+* speed limit 20, best error 0.00355002, p = {0.100, 0.00018, 1.0}
+* speed limit 30, best error 0.00353408, p = {0.100, 0.00019, 1.8}
+* speed limit 100, best error 0.00628974, p = {0.147, 0.00001, 1.8}
+
+Since I want to let the car drive as fast as possible, I choose the last one. I set p to {0.147, 0.00001, 1.8} and enter the normal driving mode, and the car can drive a full lap.
