@@ -39,7 +39,7 @@ double PID::TotalError() {
 
 void PID::PrintParam() {
     /**
-     * NEW: Print three parameters
+     * NEW: Print three parameters after twiddle
      */
     std::cout << "PID parameters are: Kp " << Kp << ", Ki " << Ki << ", Kd " << Kd << std::endl;
 }
