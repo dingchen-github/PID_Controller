@@ -37,14 +37,16 @@ int main() {
     /**
      * TODO: Initialize the pid variable.
      */
-    double p[3] = {0.06,0.0001,1.5}; // initial PID reasonable parameters
-    double dp[3] = {0.01,0.0001,0.1}; // initial twiddle parameters
+    // double p[3] = {0.0,0.0,0.0}; // for twiddle
+    double p[3] = {0.147,0.00001,1.8}; // for no twiddle
+    pid.Init(p[0], p[1], p[2]); // for no twiddle
+    double dp[3] = {0.1,0.0001,1.0}; // initial twiddle parameters
     int n = 0; // twiddle run numbers
-    bool twiddle = true; // flag for twiddle
+    bool twiddle = false; // flag for twiddle
     double tol = 0.01; // twiddle tolerance
     double err = 0.; // twiddle error
-    double best_err = 10000.; // twiddle best error
-    int it = 0; // iterator for twiddle index
+    double best_err = 1.; // twiddle best error
+    int it = 0; // iterator for p and dp index
     bool new_run = true; // flag for new simulation cycle
     bool minus = true; // flag for twiddle deduction range
     
@@ -80,8 +82,8 @@ int main() {
                         steer_value = pid.TotalError();
                         // Adjus throttle based on speed and steering angle
                         // High speed at big steering angle may lead the car to drive off track
-                        if ( (fabs(steer_value) > 0.1) && (speed > 15) )
-                            throttle = -0.3;
+                        if ( (fabs(steer_value) > 0.1) && (speed > 100) )
+                            throttle = -1.0;
                         
                         // If the car goes off track, reset the simulator
                         if (fabs(cte) >= 4.0){
@@ -91,10 +93,10 @@ int main() {
                         
                         err += pow(cte, 2);
                         n += 1;
-                        if (n == 50){
+                        if (n == 25){
                             err = err / n;
                             
-                            // If this is a new simulation cycle, twiddle p for the first time
+                            // If this is a new simulation cycle, twiddle p
                             if (new_run){
                                 p[it] += dp[it];
                                 std::cout << "new run, p[" << it << "] is " << p[it] << std::endl;
@@ -126,10 +128,10 @@ int main() {
                                 }
                             }
                             
-                            // One cycle done, reset twiddle and simulator
+                            // One cycle done, reset twiddle
                             err = 0.;
                             n = 0;
-                            // Simulator has to be reset, otherwise it does not take in new data
+                            // Rest Simulator
                             //               std::string msg = "42[\"reset\",{}]";
                             //               ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
                         }
@@ -148,13 +150,12 @@ int main() {
                     }
                     else // No twiddle, normal drive mode
                     {
-                        pid.Init(p[0], p[1], p[2]);
                         pid.UpdateError(cte);
                         steer_value = pid.TotalError();
                         // Adjus throttle based on speed and steering angle
                         // High speed at big steering angle may lead the car to drive off track
-                        if ( (fabs(steer_value) > 0.1) && (speed > 15) )
-                            throttle = -0.3;
+                        if ( (fabs(steer_value) > 0.1) && (speed > 100) )
+                            throttle = -1.0;
                         
                         json msgJson;
                         msgJson["steering_angle"] = steer_value;
